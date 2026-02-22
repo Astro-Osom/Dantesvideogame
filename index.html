@@ -4,202 +4,183 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Dante and Coco Save the Day</title>
-    <link rel="apple-touch-icon" href="Dante_App_Logo.png">
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
-        body { background: #000; color: #fff; font-family: 'Helvetica', sans-serif; margin: 0; overflow: hidden; touch-action: none; display: flex; flex-direction: column; align-items: center; }
-        canvas { background: linear-gradient(to bottom, #87CEEB 0%, #E0F7FA 100%); border: 4px solid #fff; box-shadow: 0 0 40px #000; image-rendering: pixelated; margin-top: 5px; max-width: 95vw; height: auto; }
-        .controls { display: flex; justify-content: space-between; width: 95%; max-width: 800px; margin-top: 10px; }
-        .btn { background: #556B2F; border: 3px solid #fff; color: #fff; padding: 18px; border-radius: 15px; font-weight: bold; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
-        .btn:active { transform: scale(0.9); background: #8FBC8F; }
-        #ui { position: absolute; top: 15px; width: 800px; display: flex; justify-content: space-between; padding: 0 25px; box-sizing: border-box; pointer-events: none; }
-        .stat { background: rgba(0,0,0,0.6); padding: 8px 15px; border-radius: 10px; border: 1px solid #FFB6C1; }
-        #bossBar { display: none; position: absolute; top: 70px; left: 50%; transform: translateX(-50%); width: 300px; height: 20px; background: #333; border: 2px solid #fff; border-radius: 10px; overflow: hidden; }
-        #bossFill { width: 100%; height: 100%; background: #ff0000; transition: width 0.3s; }
-        #overlay { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); border: 5px solid #FF69B4; padding: 40px; text-align: center; border-radius: 25px; width: 300px; }
+        body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: 'Courier New', Courier, monospace; }
+        #game-container { display: flex; justify-content: center; align-items: center; height: 100vh; }
     </style>
 </head>
 <body>
-
-    <div id="ui">
-        <div class="stat" id="charUI">Dante: ❤️❤️❤️</div>
-        <div class="stat" id="tokenUI">Tokens: 0/20</div>
-        <div class="stat" id="lvlUI">World 1</div>
-    </div>
-    <div id="bossBar"><div id="bossFill"></div></div>
-    <div id="overlay">
-        <h1 id="msgTitle">WORLD CLEAR!</h1>
-        <p id="msgText">Dante and Coco are unstoppable.</p>
-        <button class="btn" onclick="nextLevel()">NEXT WORLD</button>
-    </div>
-
-    <canvas id="gameCanvas" width="800" height="400"></canvas>
-
-    <div class="controls">
-        <div style="display:flex; gap:10px;">
-            <button class="btn" id="l">◀</button>
-            <button class="btn" id="r">▶</button>
-            <button class="btn" id="switch" style="background:#FF69B4">SWITCH</button>
-        </div>
-        <div style="display:flex; gap:10px;">
-            <button class="btn" id="a">STRIKE</button>
-            <button class="btn" id="j">JUMP</button>
-        </div>
-    </div>
+    <div id="game-container"></div>
 
 <script>
-    const canvas = document.getElementById("gameCanvas");
-    const ctx = canvas.getContext("2d");
+/**
+ * DANTE AND COCO SAVE THE DAY
+ * A 5-World Storytelling Ecosystem for Future Vibrant Self (2026)
+ */
+
+const config = {
+    type: Phaser.AUTO,
+    width: 800,
+    height: 450,
+    parent: 'game-container',
+    backgroundColor: '#87CEEB',
+    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+    physics: { default: 'arcade', arcade: { gravity: { y: 1000 }, debug: false } },
+    scene: { preload: preload, create: create, update: update }
+};
+
+const game = new Phaser.Game(config);
+
+// Global State
+let player, coco, buttons = {}, currentLvl = 1, dayTimer = 100;
+let boss, henchmen, tokens = 0, hearts = 3, invincibility = false;
+let timRobinson, timPlayed = false, wizard, fairy, bubble;
+let isSecretRoom = false, levelComplete = false;
+
+const lvlData = [
+    { name: "Rainbow Meadow", sky: '#87CEEB', hench: "Ghost", boss: "boss1", ground: 0x228b22 },
+    { name: "Sky Ranch", sky: '#DDA0DD', hench: "Horse", boss: "boss2", ground: 0x9370DB },
+    { name: "Volcano Factory", sky: '#4B0082', hench: "Piranha", boss: "boss3", ground: 0x4682B4 },
+    { name: "Shadow Realm", sky: '#2F4F4F', hench: "Monkey", boss: "boss4", ground: 0x000000 },
+    { name: "Dream Club", sky: '#191970', hench: "Unicorn", boss: "boss5", ground: 0xFFD700 }
+];
+
+function preload() {
+    // Hero Assets
+    this.load.image('dante', 'Dante_32_Bit_Hero.png');
+    this.load.image('coco', 'Coco_32_Bit_Hero.png');
     
-    // Character Assets
-    const imgDante = new Image(); imgDante.src = "Dante_Hero.png";
-    const imgCoco = new Image(); imgCoco.src = "Coco_Hero.png";
-
-    // Henchmen Assets (Optional: add these .pngs to GitHub)
-    const imgGhost = new Image(); imgGhost.src = "Ghost.png";
-    const imgCattle = new Image(); imgCattle.src = "Cattle.png";
-    const imgHorse = new Image(); imgHorse.src = "Horse.png";
-    const imgPiranha = new Image(); imgPiranha.src = "Piranha.png";
-
     // Boss Assets
-    const bossImgs = ["Minion_Boss.png", "Cowboy_Boss.png", "Fire_Boss.png", "Zombie_Boss.png", "ChungLi_Boss.png"].map(src => {
-        let img = new Image(); img.src = src; return img;
+    this.load.image('boss1', 'Minion_Boss.png');
+    this.load.image('boss2', 'Cowboy_Boss.png');
+    this.load.image('boss3', 'Fire_Boss.png');
+    this.load.image('boss4', 'Zombie_Boss.png');
+    this.load.image('boss5', 'ChungLi_Boss.png');
+
+    // NPC & Audio
+    this.load.audio('timSound', 'Tim_audio.m4a');
+}
+
+function create() {
+    const data = lvlData[currentLvl - 1];
+    this.cameras.main.setBackgroundColor(data.sky);
+    
+    // The Ground
+    const ground = this.add.rectangle(2000, 435, 4000, 30, data.ground);
+    this.physics.add.existing(ground, true);
+
+    // Heroes
+    player = this.physics.add.sprite(100, 300, 'dante').setScale(0.8).setDepth(10);
+    this.physics.add.collider(player, ground);
+
+    // Henchmen Group
+    henchmen = this.physics.add.group();
+    for(let i=0; i<6; i++) {
+        let h = henchmen.create(600 + (i*500), 300, 'hench').setDisplaySize(50, 50);
+        h.body.setAllowGravity(false);
+        h.setVelocityX(-120);
+    }
+
+    // Token Penalty Logic
+    this.physics.add.overlap(player, henchmen, () => {
+        if (!invincibility) {
+            if (tokens > 0) tokens--;
+            invincibility = true;
+            player.setAlpha(0.5);
+            this.time.delayedCall(1500, () => { invincibility = false; player.setAlpha(1); });
+        }
     });
 
-    let currentLvl = 1;
-    let gameState = "PLAY";
-    let activePlayer = "DANTE";
-    let tokens = 0;
-    let cameraX = 0;
+    // Robert Duvall Wizard
+    wizard = this.physics.add.sprite(1200, 320, 'wizard').setDisplaySize(60, 90);
+    wizard.body.setAllowGravity(false);
+    this.physics.add.overlap(player, wizard, enterSecretRoom, null, this);
 
-    const player = { x: 100, y: 200, w: 50, h: 85, dx: 0, dy: 0, hp: 3, dir: 1, ground: false, swinging: 0 };
-    const boss = { x: 1400, y: 150, w: 150, h: 200, hp: 10, maxHp: 10, active: false, alive: true };
-    
-    let henchmen = [];
-    let worldItems = [];
-    let bullets = [];
+    // Tim Robinson Gatekeeper
+    timRobinson = this.physics.add.sprite(1800, 320, 'tim').setDisplaySize(60, 90);
+    timRobinson.body.setAllowGravity(false);
+    bubble = this.add.text(1750, 240, "", { fontSize: '16px', backgroundColor: '#000', padding: 5 }).setVisible(false);
 
-    const levels = [
-        { name: "Rainbow Meadow", bg: "#87CEEB", ground: "#FFB6C1", enemy: "Ghost" },
-        { name: "Sky Ranch", bg: "#DDA0DD", ground: "#9370DB", enemy: "Cattle" },
-        { name: "Volcano Factory", bg: "#4B0082", ground: "#FF4500", enemy: "Piranha" },
-        { name: "Shadow Realm", bg: "#2F4F4F", ground: "#000000", enemy: "Ghost" },
-        { name: "The Dream Club", bg: "#191970", ground: "#FFD700", enemy: "Mixed" }
-    ];
+    // Boss
+    boss = this.physics.add.sprite(2200, 250, data.boss).setScale(1.2);
+    this.physics.add.collider(boss, ground);
+    boss.hp = 5;
 
-    function setupLevel(lvl) {
-        const l = levels[lvl-1];
-        document.getElementById('lvlUI').innerText = l.name;
-        player.x = 100; player.y = 200; tokens = 0;
-        boss.alive = true; boss.hp = 10; boss.active = false;
-        document.getElementById('bossBar').style.display = "none";
-        worldItems = []; henchmen = []; bullets = [];
-        
-        for(let i=0; i<20; i++) worldItems.push({ x: 300 + (i*150), y: 300, active: true });
-        for(let i=0; i<5; i++) henchmen.push({ x: 500 + (i*400), y: 270, w: 40, h: 40, type: l.enemy, hp: 1 });
+    // UI & iPad Controls
+    this.uiText = this.add.text(20, 20, '', { fontSize: '20px', fill: '#fff', stroke: '#000', strokeThickness: 3 }).setScrollFactor(0);
+    setupControls(this);
 
-        gameState = "PLAY";
-        document.getElementById('overlay').style.display = "none";
-    }
+    this.cameras.main.setBounds(0, 0, 3000, 450);
+    this.cameras.main.startFollow(player, true, 0.1, 0.1);
+}
 
-    const keys = { l: false, r: false, j: false };
-    const b = (id, k) => {
-        const el = document.getElementById(id);
-        el.onmousedown = el.ontouchstart = (e) => { 
-            e.preventDefault(); 
-            if(id === 'switch') activePlayer = (activePlayer === "DANTE") ? "COCO" : "DANTE";
-            else if(id === 'a') activePlayer === "DANTE" ? player.swinging = 12 : bullets.push({ x: player.x + 20, y: player.y + 30, dx: player.dir * 12 });
-            else keys[k] = true; 
-        };
-        el.onmouseup = el.ontouchend = (e) => { e.preventDefault(); keys[k] = false; };
+function enterSecretRoom(p, w) {
+    if (isSecretRoom) return;
+    isSecretRoom = true;
+    this.cameras.main.flash(800, 0, 100, 255);
+    this.cameras.main.setBackgroundColor('#000033'); // Air Aquarium Feel
+    tokens += 10;
+    wizard.destroy();
+}
+
+function setupControls(scene) {
+    const createBtn = (x, y, txt, key) => {
+        let b = scene.add.rectangle(x, y, 90, 70, 0x556B2F).setInteractive().setScrollFactor(0).setAlpha(0.7);
+        scene.add.text(x, y, txt, { fontSize: '18px', fill: '#fff' }).setOrigin(0.5).setScrollFactor(0);
+        b.on('pointerdown', () => { buttons[key] = true; });
+        b.on('pointerup', () => { buttons[key] = false; });
     };
-    b('l','l'); b('r','r'); b('j','j'); b('a','a'); b('switch','s');
+    createBtn(70, 380, '◀', 'left'); createBtn(180, 380, '▶', 'right');
+    createBtn(600, 380, 'STRIKE', 'action'); createBtn(710, 380, 'JUMP', 'jump');
+}
 
-    function update() {
-        if(gameState !== "PLAY") return;
+function update() {
+    if (levelComplete) return;
 
-        if(keys.l) { player.dx = -7; player.dir = -1; }
-        else if(keys.r) { player.dx = 7; player.dir = 1; }
-        else player.dx *= 0.8;
+    // Day/Night Atmospheric Engine
+    dayTimer -= 0.012;
+    if (dayTimer <= 0) { 
+        alert("NIGHT HAS FALLEN! Restarting World..."); 
+        this.scene.restart(); 
+        dayTimer = 100;
+    }
 
-        if(keys.j && player.ground) { player.dy = -15; player.ground = false; }
-        player.dy += 0.7; player.x += player.dx; player.y += player.dy;
-        if(player.y > 270) { player.y = 270; player.dy = 0; player.ground = true; }
-        cameraX = Math.max(0, player.x - 250);
+    // Movement Logic
+    if (buttons.left) { player.setVelocityX(-260); player.setFlipX(true); }
+    else if (buttons.right) { player.setVelocityX(260); player.setFlipX(false); }
+    else player.setVelocityX(0);
 
-        // Boss Battle Logic
-        if(player.x > 1100 && boss.alive) {
-            boss.active = true;
-            document.getElementById('bossBar').style.display = "block";
-            if(player.x < 1100) player.x = 1100;
-        }
+    if (buttons.jump && player.body.blocked.down) player.setVelocityY(-550);
 
-        // Henchmen & Combat
-        henchmen.forEach((h, i) => {
-            if(h.type === "Piranha") h.y += Math.sin(Date.now()/200) * 2;
-            if(player.swinging > 0 && Math.abs(player.x - h.x) < 80) henchmen.splice(i, 1);
-            bullets.forEach((bull, bi) => {
-                if(Math.abs(bull.x - h.x) < 30) { henchmen.splice(i, 1); bullets.splice(bi, 1); }
-            });
-            // Collision hit
-            if(Math.abs(player.x - h.x) < 40 && Math.abs(player.y - h.y) < 40) {
-                 // Simple reset or heart loss logic
+    // Tim Robinson Gatekeeper
+    let distToTim = Phaser.Math.Distance.Between(player.x, player.y, timRobinson.x, timRobinson.y);
+    if (distToTim < 200) {
+        bubble.setVisible(true).setText("YOU SURE ABOUT THAT?").setPosition(timRobinson.x - 80, 240);
+        if (!timPlayed) { this.sound.play('timSound'); timPlayed = true; }
+    }
+
+    // Combat Logic
+    if (buttons.action) {
+        let fx = this.add.circle(player.x + (player.flipX ? -60 : 60), player.y, 40, 0x00ffff, 0.4);
+        this.time.delayedCall(100, () => fx.destroy());
+        if (Phaser.Math.Distance.Between(player.x, player.y, boss.x, boss.y) < 120) {
+            boss.hp -= 0.05;
+            if (boss.hp <= 0) {
+                levelComplete = true;
+                alert(`WORLD ${currentLvl} SAVED!`);
+                currentLvl = currentLvl < 5 ? currentLvl + 1 : 1;
+                this.scene.restart();
+                levelComplete = false;
+                timPlayed = false;
+                isSecretRoom = false;
+                dayTimer = 100;
             }
-        });
-
-        // Boss Combat
-        if(boss.active && boss.alive) {
-            if(player.swinging > 0 && Math.abs((player.x + (player.dir*50)) - boss.x) < 80) { boss.hp -= 0.1; player.swinging = 0; }
-            bullets.forEach((bull, i) => { if(bull.x > boss.x) { boss.hp -= 1; bullets.splice(i, 1); }});
-            document.getElementById('bossFill').style.width = (boss.hp / 10 * 100) + "%";
-            if(boss.hp <= 0) boss.alive = false;
         }
-
-        worldItems.forEach(t => { if(t.active && Math.abs(player.x - t.x) < 40) { t.active = false; tokens++; }});
-        if(!boss.alive) { gameState = "MSG"; document.getElementById('overlay').style.display = "block"; }
-        bullets.forEach((b, i) => { b.x += b.dx; if(b.x > player.x + 800) bullets.splice(i,1); });
-        if(player.swinging > 0) player.swinging--;
-
-        draw();
-        requestAnimationFrame(update);
     }
 
-    function draw() {
-        ctx.clearRect(0,0,800,400);
-        ctx.fillStyle = levels[currentLvl-1].bg;
-        ctx.fillRect(0,0,800,400);
-        ctx.save();
-        ctx.translate(-cameraX, 0);
-
-        // Environment
-        ctx.fillStyle = levels[currentLvl-1].ground;
-        ctx.fillRect(0, 350, 4000, 50);
-
-        // Henchmen
-        henchmen.forEach(h => {
-            let hImg = h.type === "Ghost" ? imgGhost : h.type === "Cattle" ? imgCattle : imgPiranha;
-            if(hImg.complete) ctx.drawImage(hImg, h.x, h.y, h.w, h.h);
-            else { ctx.fillStyle = "purple"; ctx.fillRect(h.x, h.y, h.w, h.h); }
-        });
-
-        // Boss
-        if(boss.alive) ctx.drawImage(bossImgs[currentLvl-1], boss.x, boss.y, boss.w, boss.h);
-
-        // Player & Weapons
-        ctx.fillStyle = "gold"; worldItems.forEach(t => { if(t.active) ctx.fillRect(t.x, t.y, 15, 15); });
-        ctx.fillStyle = "yellow"; bullets.forEach(b => ctx.fillRect(b.x, b.y, 15, 5));
-        
-        ctx.save();
-        const img = (activePlayer === "DANTE") ? imgDante : imgCoco;
-        if(player.dir === -1) { ctx.translate(player.x + player.w, player.y); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0, player.w, player.h); }
-        else ctx.drawImage(img, player.x, player.y, player.w, player.h);
-        ctx.restore();
-
-        if(player.swinging > 0) { ctx.strokeStyle = "cyan"; ctx.lineWidth = 10; ctx.beginPath(); ctx.arc(player.x + (player.dir*40), player.y + 40, 50, -0.5, 0.5); ctx.stroke(); }
-        ctx.restore();
-    }
-
-    function nextLevel() { if(currentLvl < 5) { currentLvl++; setupLevel(currentLvl); } else location.reload(); }
-    setupLevel(1);
+    this.uiText.setText(`DAYLIGHT: ${Math.floor(dayTimer)}% | TOKENS: ${tokens}/20 | HEARTS: ❤️❤️❤️`);
+}
 </script>
 </body>
 </html>
