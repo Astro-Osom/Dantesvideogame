@@ -98,6 +98,10 @@ function initSize(sprite, w, h) {
     sprite.setDisplaySize(w, h);
     sprite._bsx = sprite.scaleX;
     sprite._bsy = sprite.scaleY;
+    // Sync physics body to new scale (if physics-enabled)
+    if (sprite.body) {
+        sprite.body.updateFromGameObject();
+    }
     return sprite;
 }
 
@@ -929,6 +933,7 @@ class GameScene extends Phaser.Scene {
     createCheckpoints() {
         [1200, 2400, 3600].forEach(x => {
             const cp = this.checkpoints.create(x, H - 70, 'checkpoint');
+            initSize(cp, 30, 40);
             cp.setData('activated', false);
         });
     }
@@ -946,7 +951,7 @@ class GameScene extends Phaser.Scene {
             const isFlyer = (henchType === 'piranha' || henchType === 'monkey');
             const y = isFlyer ? Phaser.Math.Between(150, 300) : H - 70;
             const h = this.henchGroup.create(x, y, henchType);
-            initSize(h, 40, 40);
+            initSize(h, henchType === 'cattle' ? 48 : 40, 40);
             h.setDepth(5);
             h.body.setAllowGravity(!isFlyer && henchType !== 'ghost');
             h.setData('baseY', y);
@@ -963,7 +968,6 @@ class GameScene extends Phaser.Scene {
             } else if (henchType === 'cattle') {
                 // Cattle: slower but wider patrol, charge when close
                 h.setVelocityX(Phaser.Math.Between(0, 1) ? -speed * 0.7 : speed * 0.7);
-                initSize(h, 48, 40); // slightly wider
             } else {
                 h.setVelocityX(Phaser.Math.Between(0, 1) ? -speed : speed);
             }
@@ -1013,7 +1017,9 @@ class GameScene extends Phaser.Scene {
         }).setDepth(7).setVisible(false);
 
         // Boss portal (locked initially)
-        this.bossPortal = this.add.image(WORLD_WIDTH * 0.9, H - 70, 'portal').setScale(2).setDepth(5).setAlpha(0.3);
+        this.bossPortal = this.add.image(WORLD_WIDTH * 0.9, H - 70, 'portal');
+        initSize(this.bossPortal, 50, 50);
+        this.bossPortal.setDepth(5).setAlpha(0.3);
         this.bossPortalActive = false;
     }
 
@@ -1024,8 +1030,7 @@ class GameScene extends Phaser.Scene {
         initSize(this.player, 36, 48);
         this.player.setDepth(10);
         this.player.setCollideWorldBounds(false);
-        this.player.body.setSize(36, 48);
-        this.player.body.setOffset(0, 0);
+        // Let Phaser auto-size body from texture × scale (don't call body.setSize — it double-scales)
 
         // Player glow outline
         this.playerGlow = this.add.circle(startX, H - 100, 24,
@@ -1108,8 +1113,11 @@ class GameScene extends Phaser.Scene {
         this.switchBtn.on('pointerdown', () => {
             GameState.activeChar = GameState.activeChar === 'dante' ? 'coco' : 'dante';
             this.player.setTexture(GameState.activeChar);
+            initSize(this.player, 36, 48); // re-apply display size for new texture
             this.playerGlow.fillColor = GameState.activeChar === 'dante' ? COLORS.danteBlue : COLORS.cocoPink;
-            this.switchBtn.setTexture(GameState.activeChar === 'dante' ? 'coco' : 'dante');
+            const newSwitch = GameState.activeChar === 'dante' ? 'coco' : 'dante';
+            this.switchBtn.setTexture(newSwitch);
+            initSize(this.switchBtn, 30, 40); // re-apply for switch icon too
             this.hoverActive = false;
             this.dashActive = false;
             this.shieldActive = false;
@@ -1484,6 +1492,7 @@ class GameScene extends Phaser.Scene {
     cocoAttack() {
         const dir = this.player.flipX ? -1 : 1;
         const proj = this.projectiles.create(this.player.x + dir * 20, this.player.y, 'star');
+        initSize(proj, 16, 16);
         proj.body.setAllowGravity(false);
         proj.setDepth(11);
 
@@ -1550,7 +1559,8 @@ class GameScene extends Phaser.Scene {
                 const isFlyer = (henchType === 'piranha' || henchType === 'monkey');
                 const y = isFlyer ? Phaser.Math.Between(150, 300) : H - 70;
                 const newH = this.henchGroup.create(Phaser.Math.Clamp(x, 100, WORLD_WIDTH - 100), y, henchType);
-                newH.setDisplaySize(henchType === 'cattle' ? 48 : 40, 40).setDepth(5);
+                initSize(newH, henchType === 'cattle' ? 48 : 40, 40);
+                newH.setDepth(5);
                 newH.body.setAllowGravity(!isFlyer && henchType !== 'ghost');
                 newH.setData('speed', diff.henchSpeed);
                 newH.setData('alive', true);
@@ -1639,7 +1649,9 @@ class GameScene extends Phaser.Scene {
         if (GameState.tokens >= diff.tokensNeeded && !this.bossPortalActive) {
             this.bossPortalActive = true;
             this.bossPortal.setAlpha(1);
-            this.tweens.add({ targets: this.bossPortal, scaleX: 2.3, scaleY: 2.3, duration: 500, yoyo: true, repeat: -1 });
+            const pbx = this.bossPortal._bsx || this.bossPortal.scaleX;
+            const pby = this.bossPortal._bsy || this.bossPortal.scaleY;
+            this.tweens.add({ targets: this.bossPortal, scaleX: pbx * 1.3, scaleY: pby * 1.3, duration: 500, yoyo: true, repeat: -1 });
         }
     }
 
@@ -2115,7 +2127,7 @@ class BossScene extends Phaser.Scene {
         this.player = this.physics.add.sprite(100, H - 100, GameState.activeChar);
         initSize(this.player, 42, 56);
         this.player.setDepth(10);
-        this.player.body.setSize(20, 40).setOffset(6, 4);
+        // Let Phaser auto-size body from texture × scale
         this.physics.add.collider(this.player, ground);
         this.physics.add.collider(this.player, plats);
 
