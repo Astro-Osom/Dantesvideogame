@@ -1,0 +1,22 @@
+{
+  "name": "Dante and Coco Save the Day",
+  "short_name": "Dante & Coco",
+  "description": "Help Dante and Coco explore five Imagination Worlds and save the day before Night Forever!",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0a0a2e",
+  "theme_color": "#0a0a2e",
+  "icons": [
+    {
+      "src": "Dante_App_Logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "Dante_App_Logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
