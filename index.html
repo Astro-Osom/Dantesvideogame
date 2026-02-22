@@ -92,6 +92,16 @@ const LEVELS = [
 ];
 
 // ============================================================================
+// SPRITE SIZE HELPER — stores base scales so animations can be relative
+// ============================================================================
+function initSize(sprite, w, h) {
+    sprite.setDisplaySize(w, h);
+    sprite._bsx = sprite.scaleX;
+    sprite._bsy = sprite.scaleY;
+    return sprite;
+}
+
+// ============================================================================
 // SAVE SYSTEM
 // ============================================================================
 class SaveManager {
@@ -621,9 +631,9 @@ class TitleScene extends Phaser.Scene {
             fill: '#ffdd44', stroke: '#000', strokeThickness: 2
         }).setOrigin(0.5);
 
-        // Characters preview
-        this.add.image(cx - 60, 170, 'dante').setScale(3);
-        this.add.image(cx + 60, 170, 'coco').setScale(3);
+        // Characters preview (scaled for hi-res assets)
+        initSize(this.add.image(cx - 60, 170, 'dante'), 72, 96);
+        initSize(this.add.image(cx + 60, 170, 'coco'), 72, 96);
 
         // Save slots
         const slots = SaveManager.getSlots();
@@ -900,6 +910,7 @@ class GameScene extends Phaser.Scene {
 
         positions.forEach(pos => {
             const token = this.tokenGroup.create(pos.x, pos.y, 'token');
+            initSize(token, 24, 24);
             token.body.setAllowGravity(false);
             token.setDepth(5);
             // Gentle float
@@ -935,7 +946,8 @@ class GameScene extends Phaser.Scene {
             const isFlyer = (henchType === 'piranha' || henchType === 'monkey');
             const y = isFlyer ? Phaser.Math.Between(150, 300) : H - 70;
             const h = this.henchGroup.create(x, y, henchType);
-            h.setDisplaySize(40, 40).setDepth(5);
+            initSize(h, 40, 40);
+            h.setDepth(5);
             h.body.setAllowGravity(!isFlyer && henchType !== 'ghost');
             h.setData('baseY', y);
             h.setData('speed', speed);
@@ -951,7 +963,7 @@ class GameScene extends Phaser.Scene {
             } else if (henchType === 'cattle') {
                 // Cattle: slower but wider patrol, charge when close
                 h.setVelocityX(Phaser.Math.Between(0, 1) ? -speed * 0.7 : speed * 0.7);
-                h.setDisplaySize(48, 40); // slightly wider
+                initSize(h, 48, 40); // slightly wider
             } else {
                 h.setVelocityX(Phaser.Math.Between(0, 1) ? -speed : speed);
             }
@@ -966,6 +978,7 @@ class GameScene extends Phaser.Scene {
     createNPCs() {
         // Wizard at ~40% of level
         this.wizard = this.physics.add.sprite(WORLD_WIDTH * 0.4, H - 80, 'wizard');
+        initSize(this.wizard, 40, 56);
         this.wizard.body.setAllowGravity(false);
         this.wizard.setDepth(6);
         this.wizardActivated = false;
@@ -978,6 +991,7 @@ class GameScene extends Phaser.Scene {
 
         // Fairy Godmother at ~25%
         this.fairy = this.physics.add.sprite(WORLD_WIDTH * 0.25, H - 80, 'fairy');
+        initSize(this.fairy, 40, 56);
         this.fairy.body.setAllowGravity(false);
         this.fairy.setDepth(6);
         this.fairyUsed = false;
@@ -989,6 +1003,7 @@ class GameScene extends Phaser.Scene {
 
         // Tim Robinson at ~85% (before boss portal)
         this.tim = this.physics.add.sprite(WORLD_WIDTH * 0.85, H - 80, 'tim');
+        initSize(this.tim, 40, 56);
         this.tim.body.setAllowGravity(false);
         this.tim.setDepth(6);
         this.timActivated = false;
@@ -1006,10 +1021,11 @@ class GameScene extends Phaser.Scene {
     createPlayer() {
         const startX = GameState.checkpointX || 100;
         this.player = this.physics.add.sprite(startX, H - 100, GameState.activeChar);
-        this.player.setScale(1.5).setDepth(10);
+        initSize(this.player, 36, 48);
+        this.player.setDepth(10);
         this.player.setCollideWorldBounds(false);
-        this.player.body.setSize(20, 40);
-        this.player.body.setOffset(6, 4);
+        this.player.body.setSize(36, 48);
+        this.player.body.setOffset(0, 0);
 
         // Player glow outline
         this.playerGlow = this.add.circle(startX, H - 100, 24,
@@ -1083,8 +1099,9 @@ class GameScene extends Phaser.Scene {
 
         // Character switch (top-right, small)
         const switchChar = GameState.activeChar === 'dante' ? 'coco' : 'dante';
-        this.switchBtn = this.add.image(W - 40, 40, switchChar).setScale(1.2)
-            .setScrollFactor(0).setDepth(100).setInteractive().setAlpha(0.7);
+        this.switchBtn = this.add.image(W - 40, 40, switchChar);
+        initSize(this.switchBtn, 30, 40);
+        this.switchBtn.setScrollFactor(0).setDepth(100).setInteractive().setAlpha(0.7);
         const switchBorder = this.add.circle(W - 40, 40, 20, 0x000000, 0)
             .setScrollFactor(0).setDepth(99).setStrokeStyle(2, COLORS.neonCyan, 0.5);
 
@@ -1274,28 +1291,26 @@ class GameScene extends Phaser.Scene {
 
     animatePlayer(time, delta) {
         const p = this.player;
+        const bx = p._bsx || p.scaleX, by = p._bsy || p.scaleY; // base scales
         const vx = p.body.velocity.x;
         const vy = p.body.velocity.y;
         const onGround = p.body.blocked.down;
         const isMoving = Math.abs(vx) > 10;
-        const isAttacking = this.attackCooldown > 200; // just attacked
+        const isAttacking = this.attackCooldown > 200;
 
         // ---- IDLE BREATHING ----
         if (!isMoving && onGround && !isAttacking) {
             const breathe = 1 + Math.sin(time / 400) * 0.03;
-            p.setScale(1.5 * breathe, 1.5 / breathe);
+            p.setScale(bx * breathe, by / breathe);
         }
 
         // ---- RUN CYCLE (bob + tilt) ----
         if (isMoving && onGround) {
-            // Vertical bob simulating footsteps
             const bob = Math.sin(time / 80) * 2;
             p.y += bob * (delta / 16);
-            // Slight forward lean in movement direction
             const lean = vx > 0 ? 0.07 : -0.07;
             p.setRotation(lean);
-            // Run squash (wider, shorter)
-            p.setScale(1.55, 1.45);
+            p.setScale(bx * 1.03, by * 0.97);
         } else if (onGround && !isAttacking) {
             p.setRotation(0);
         }
@@ -1303,32 +1318,28 @@ class GameScene extends Phaser.Scene {
         // ---- JUMP & FALL ----
         if (!onGround) {
             if (vy < -100) {
-                // Rising: stretch tall (launch)
                 const stretch = Math.min(1.15, 1 + Math.abs(vy) / 3000);
-                p.setScale(1.5 / stretch, 1.5 * stretch);
+                p.setScale(bx / stretch, by * stretch);
                 p.setRotation(0);
             } else if (vy > 50) {
-                // Falling: spread wide
                 const spread = Math.min(1.12, 1 + vy / 3000);
-                p.setScale(1.5 * spread, 1.5 / spread);
+                p.setScale(bx * spread, by / spread);
             }
 
-            // Coco hover: gentle float wobble
             if (this.hoverActive) {
                 p.setRotation(Math.sin(time / 200) * 0.1);
-                p.setScale(1.5, 1.5 + Math.sin(time / 300) * 0.05);
+                p.setScale(bx, by * (1 + Math.sin(time / 300) * 0.03));
             }
         }
 
         // ---- LAND SQUASH (one-shot) ----
         if (onGround && this._wasInAir) {
-            // Squash on landing
             this.tweens.add({
                 targets: p,
-                scaleX: 1.7, scaleY: 1.3,
+                scaleX: bx * 1.13, scaleY: by * 0.87,
                 duration: 60, yoyo: true,
                 ease: 'Quad.easeOut',
-                onComplete: () => { p.setScale(1.5, 1.5); }
+                onComplete: () => { p.setScale(bx, by); }
             });
         }
         this._wasInAir = !onGround;
@@ -1336,21 +1347,20 @@ class GameScene extends Phaser.Scene {
         // ---- ATTACK PUNCH (scale burst) ----
         if (isAttacking) {
             const dir = p.flipX ? -1 : 1;
-            // Lunge forward
-            p.setScale(1.6, 1.4);
+            p.setScale(bx * 1.07, by * 0.93);
             p.setRotation(dir * -0.15);
         }
 
         // ---- DASH (Dante) ----
         if (this.dashActive) {
-            p.setScale(1.7, 1.3);
+            p.setScale(bx * 1.13, by * 0.87);
             p.setRotation(p.flipX ? -0.2 : 0.2);
         }
 
         // ---- SHIELD (Coco) ----
         if (this.shieldActive) {
             const pulse = 1 + Math.sin(time / 150) * 0.05;
-            p.setScale(1.5 * pulse, 1.5 * pulse);
+            p.setScale(bx * pulse, by * pulse);
             p.setRotation(0);
         }
 
@@ -1364,10 +1374,12 @@ class GameScene extends Phaser.Scene {
         this.henchGroup.getChildren().forEach(h => {
             if (!h.active || !h.getData('alive')) return;
             const type = h.getData('henchType') || 'ghost';
+            const bx = h._bsx || h.scaleX, by = h._bsy || h.scaleY;
 
             // Ghost: ethereal wobble + pulsing transparency
             if (type === 'ghost') {
-                h.setScale(1 + Math.sin(time / 300 + h.x) * 0.08);
+                const f = 1 + Math.sin(time / 300 + h.x) * 0.08;
+                h.setScale(bx * f, by * f);
                 h.setAlpha(0.6 + Math.sin(time / 500 + h.x) * 0.25);
                 h.setRotation(Math.sin(time / 400 + h.x) * 0.15);
             }
@@ -1377,7 +1389,6 @@ class GameScene extends Phaser.Scene {
                 const gallop = Math.abs(Math.sin(time / 100 + h.x)) * 3;
                 h.y -= gallop * 0.1;
                 h.setRotation(Math.sin(time / 100 + h.x) * 0.05);
-                // Flip based on velocity
                 if (h.body.velocity.x < 0) h.setFlipX(true);
                 else if (h.body.velocity.x > 0) h.setFlipX(false);
             }
@@ -1386,14 +1397,14 @@ class GameScene extends Phaser.Scene {
             if (type === 'cattle') {
                 const stomp = Math.abs(Math.sin(time / 150 + h.x)) * 2;
                 h.y -= stomp * 0.08;
-                h.setScale(1.2 + Math.sin(time / 200) * 0.04, 1 - Math.sin(time / 200) * 0.03);
+                h.setScale(bx * (1 + Math.sin(time / 200) * 0.04), by * (1 - Math.sin(time / 200) * 0.03));
                 if (h.body.velocity.x < 0) h.setFlipX(true);
                 else if (h.body.velocity.x > 0) h.setFlipX(false);
             }
 
             // Piranha: flapping fins + mouth snapping
             if (type === 'piranha') {
-                h.setScale(1 + Math.sin(time / 200 + h.x) * 0.1, 1 - Math.sin(time / 200 + h.x) * 0.06);
+                h.setScale(bx * (1 + Math.sin(time / 200 + h.x) * 0.1), by * (1 - Math.sin(time / 200 + h.x) * 0.06));
                 h.setRotation(Math.sin(time / 300 + h.x) * 0.2);
                 if (h.body.velocity.x < 0) h.setFlipX(true);
                 else if (h.body.velocity.x > 0) h.setFlipX(false);
@@ -1402,14 +1413,16 @@ class GameScene extends Phaser.Scene {
             // Monkey: swinging / bouncy
             if (type === 'monkey') {
                 h.setRotation(Math.sin(time / 250 + h.x) * 0.3);
-                h.setScale(1 + Math.sin(time / 180) * 0.06);
+                const f = 1 + Math.sin(time / 180) * 0.06;
+                h.setScale(bx * f, by * f);
             }
 
             // Unicorn: prancing + sparkle scale
             if (type === 'unicorn') {
                 const prance = Math.sin(time / 120 + h.x) * 4;
                 h.y -= prance * 0.05;
-                h.setScale(1 + Math.sin(time / 300) * 0.05);
+                const f = 1 + Math.sin(time / 300) * 0.05;
+                h.setScale(bx * f, by * f);
                 h.setRotation(Math.sin(time / 200 + h.x) * 0.08);
                 if (h.body.velocity.x < 0) h.setFlipX(true);
                 else if (h.body.velocity.x > 0) h.setFlipX(false);
@@ -1420,23 +1433,26 @@ class GameScene extends Phaser.Scene {
     animateNPCs(time) {
         // Wizard: gentle hover + mystical sway
         if (this.wizard && this.wizard.active && !this.wizardActivated) {
-            this.wizard.y += Math.sin(time / 600) * 0.3;
-            this.wizard.setRotation(Math.sin(time / 800) * 0.05);
-            this.wizard.setScale(1 + Math.sin(time / 500) * 0.03);
+            const w = this.wizard, wbx = w._bsx || w.scaleX, wby = w._bsy || w.scaleY;
+            w.y += Math.sin(time / 600) * 0.3;
+            w.setRotation(Math.sin(time / 800) * 0.05);
+            const f = 1 + Math.sin(time / 500) * 0.03;
+            w.setScale(wbx * f, wby * f);
         }
 
         // Fairy: fluttering up/down + wing-beat scale
         if (this.fairy && this.fairy.visible && !this.fairyUsed) {
-            this.fairy.y += Math.sin(time / 300) * 0.5;
-            this.fairy.setScale(1 + Math.sin(time / 150) * 0.08, 1 - Math.sin(time / 150) * 0.04);
-            this.fairy.setRotation(Math.sin(time / 400) * 0.1);
+            const f = this.fairy, fbx = f._bsx || f.scaleX, fby = f._bsy || f.scaleY;
+            f.y += Math.sin(time / 300) * 0.5;
+            f.setScale(fbx * (1 + Math.sin(time / 150) * 0.08), fby * (1 - Math.sin(time / 150) * 0.04));
+            f.setRotation(Math.sin(time / 400) * 0.1);
         }
 
         // Tim: subtle impatient weight shift
         if (this.tim && this.tim.active && !this.timActivated) {
-            this.tim.setScale(1 + Math.sin(time / 700) * 0.02, 1 - Math.sin(time / 700) * 0.02);
-            // Occasional skeptical head tilt
-            this.tim.setRotation(Math.sin(time / 1200) * 0.04);
+            const t = this.tim, tbx = t._bsx || t.scaleX, tby = t._bsy || t.scaleY;
+            t.setScale(tbx * (1 + Math.sin(time / 700) * 0.02), tby * (1 - Math.sin(time / 700) * 0.02));
+            t.setRotation(Math.sin(time / 1200) * 0.04);
         }
     }
 
@@ -1846,12 +1862,16 @@ class UIScene extends Phaser.Scene {
         // Hearts
         this.heartIcons = [];
         for (let i = 0; i < 4; i++) {
-            const h = this.add.image(60 + i * 30, 40, 'heart').setScale(1.2).setDepth(200);
+            const h = this.add.image(60 + i * 30, 40, 'heart');
+            initSize(h, 22, 20);
+            h.setDepth(200);
             this.heartIcons.push(h);
         }
 
         // Token display
-        this.tokenIcon = this.add.image(W/2 - 30, 32, 'token').setScale(1.3).setDepth(200);
+        this.tokenIcon = this.add.image(W/2 - 30, 32, 'token');
+        initSize(this.tokenIcon, 22, 22);
+        this.tokenIcon.setDepth(200);
         this.tokenText = this.add.text(W/2 - 12, 24, '0', {
             fontSize: '22px', fill: '#ffdd44', fontStyle: 'bold',
             stroke: '#000', strokeThickness: 3
@@ -1898,15 +1918,17 @@ class UIScene extends Phaser.Scene {
         // Pulse last heart
         if (GameState.hearts === 1) {
             if (!this.heartPulse) {
+                const hrt = this.heartIcons[0];
+                const hbx = hrt._bsx || hrt.scaleX, hby = hrt._bsy || hrt.scaleY;
                 this.heartPulse = this.tweens.add({
-                    targets: this.heartIcons[0], scaleX: 1.5, scaleY: 1.5,
+                    targets: hrt, scaleX: hbx * 1.3, scaleY: hby * 1.3,
                     duration: 400, yoyo: true, repeat: -1
                 });
             }
         } else if (this.heartPulse) {
             this.heartPulse.stop();
             this.heartPulse = null;
-            this.heartIcons.forEach(h => h.setScale(1.2));
+            this.heartIcons.forEach(h => h.setScale(h._bsx || h.scaleX, h._bsy || h.scaleY));
         }
 
         // Tokens
@@ -2008,7 +2030,9 @@ class SecretRoomScene extends Phaser.Scene {
         for (let i = 0; i < 12; i++) {
             const t = this.add.image(
                 80 + (i % 6) * 140, 150 + Math.floor(i / 6) * 150, 'token'
-            ).setScale(1.5).setInteractive();
+            );
+            initSize(t, 30, 30);
+            t.setInteractive();
 
             t.on('pointerdown', () => {
                 GameState.tokens++;
@@ -2088,13 +2112,17 @@ class BossScene extends Phaser.Scene {
         });
 
         // Player
-        this.player = this.physics.add.sprite(100, H - 100, GameState.activeChar).setScale(1.5).setDepth(10);
+        this.player = this.physics.add.sprite(100, H - 100, GameState.activeChar);
+        initSize(this.player, 42, 56);
+        this.player.setDepth(10);
         this.player.body.setSize(20, 40).setOffset(6, 4);
         this.physics.add.collider(this.player, ground);
         this.physics.add.collider(this.player, plats);
 
         // Boss
-        this.boss = this.physics.add.sprite(W - 150, H - 100, ld.bossKey).setScale(2).setDepth(10);
+        this.boss = this.physics.add.sprite(W - 150, H - 100, ld.bossKey);
+        initSize(this.boss, 72, 72);
+        this.boss.setDepth(10);
         this.physics.add.collider(this.boss, ground);
         this.boss.hp = diff.bossHP;
         this.boss.maxHP = diff.bossHP;
@@ -2147,7 +2175,10 @@ class BossScene extends Phaser.Scene {
         // Hearts display
         this.heartIcons = [];
         for (let i = 0; i < 4; i++) {
-            this.heartIcons.push(this.add.image(30 + i * 28, 25, 'heart').setScale(1).setDepth(200));
+            const bh = this.add.image(30 + i * 28, 25, 'heart');
+            initSize(bh, 20, 18);
+            bh.setDepth(200);
+            this.heartIcons.push(bh);
         }
     }
 
@@ -2227,38 +2258,38 @@ class BossScene extends Phaser.Scene {
 
         // ---- BOSS SPRITE ANIMATION ----
         if (this.boss && this.boss.active) {
-            // Menacing idle: breathing scale
-            const breathe = 1 + Math.sin(time / 350) * 0.05;
-            const baseScale = 2;
-            // Phase 2+: faster, more aggressive breathing
+            const bbx = this.boss._bsx || this.boss.scaleX;
+            const bby = this.boss._bsy || this.boss.scaleY;
             const agitation = this.bossPhase >= 3 ? 0.08 : this.bossPhase >= 2 ? 0.06 : 0.04;
             const breathSpeed = this.bossPhase >= 3 ? 200 : this.bossPhase >= 2 ? 280 : 350;
             this.boss.setScale(
-                baseScale * (1 + Math.sin(time / breathSpeed) * agitation),
-                baseScale * (1 - Math.sin(time / breathSpeed) * agitation * 0.6)
+                bbx * (1 + Math.sin(time / breathSpeed) * agitation),
+                bby * (1 - Math.sin(time / breathSpeed) * agitation * 0.6)
             );
-            // Slight menacing lean toward player
             const leanDir = this.player.x < this.boss.x ? 0.08 : -0.08;
             this.boss.setRotation(leanDir + Math.sin(time / 400) * 0.04);
             this.boss.setFlipX(this.player.x < this.boss.x);
         }
 
         // ---- PLAYER ANIMATION IN BOSS ARENA ----
+        const pbx = this.player._bsx || this.player.scaleX;
+        const pby = this.player._bsy || this.player.scaleY;
         const pvx = this.player.body.velocity.x;
         const pvy = this.player.body.velocity.y;
         const pOnGround = this.player.body.blocked.down;
         if (Math.abs(pvx) > 10 && pOnGround) {
             this.player.y += Math.sin(time / 80) * 0.3;
             this.player.setRotation(pvx > 0 ? 0.07 : -0.07);
-            this.player.setScale(1.55, 1.45);
+            this.player.setScale(pbx * 1.03, pby * 0.97);
         } else if (pOnGround) {
-            this.player.setScale(1.5 * (1 + Math.sin(time / 400) * 0.03), 1.5 / (1 + Math.sin(time / 400) * 0.03));
+            const b = 1 + Math.sin(time / 400) * 0.03;
+            this.player.setScale(pbx * b, pby / b);
             this.player.setRotation(0);
         } else if (pvy < -100) {
-            this.player.setScale(1.5 / 1.1, 1.5 * 1.1);
+            this.player.setScale(pbx / 1.1, pby * 1.1);
             this.player.setRotation(0);
         } else if (pvy > 50) {
-            this.player.setScale(1.5 * 1.08, 1.5 / 1.08);
+            this.player.setScale(pbx * 1.08, pby / 1.08);
         }
         if (this.invincible) {
             this.player.setAlpha(Math.sin(time / 60) > 0 ? 0.8 : 0.3);
