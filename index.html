@@ -3,23 +3,29 @@
   <head>
     <meta charset="UTF-8" />
     <title>Dante and Coco Save the Day</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
 
     <!-- Phaser 3 from CDN -->
     <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.js"></script>
 
     <style>
+      html,
       body {
         margin: 0;
         padding: 0;
         background: #000;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
       }
+
       #game-container {
-        touch-action: none;
+        width: 100%;
+        height: 100%;
+        touch-action: none; /* better for mobile */
       }
     </style>
   </head>
