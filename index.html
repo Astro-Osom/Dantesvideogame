@@ -4,9 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Dante and Coco Save the Day</title>
+    
+    <link rel="apple-touch-icon" href="Dante_App_Logo.png">
+    
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: 'Courier New', Courier, monospace; }
+        body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: 'Helvetica', sans-serif; }
         #game-container { display: flex; justify-content: center; align-items: center; height: 100vh; }
     </style>
 </head>
@@ -15,8 +18,8 @@
 
 <script>
 /**
- * DANTE AND COCO SAVE THE DAY
- * A 5-World Storytelling Ecosystem for Future Vibrant Self (2026)
+ * DANTE AND COCO SAVE THE DAY: THE MASTER BUILD
+ * 5 Worlds | Robert Duvall Wizard | Tim Robinson Gatekeeper | Eternal Night Timer
  */
 
 const config = {
@@ -32,11 +35,10 @@ const config = {
 
 const game = new Phaser.Game(config);
 
-// Global State
-let player, coco, buttons = {}, currentLvl = 1, dayTimer = 100;
-let boss, henchmen, tokens = 0, hearts = 3, invincibility = false;
-let timRobinson, timPlayed = false, wizard, fairy, bubble;
-let isSecretRoom = false, levelComplete = false;
+let player, buttons = {}, currentLvl = 1, dayTimer = 100;
+let boss, henchmen, tokens = 0, hearts = 3, activeChar = "DANTE";
+let timRobinson, timPlayed = false, wizard, fairy, bubble, secretActive = false;
+let invincibility = false, levelComplete = false;
 
 const lvlData = [
     { name: "Rainbow Meadow", sky: '#87CEEB', hench: "Ghost", boss: "boss1", ground: 0x228b22 },
@@ -47,7 +49,7 @@ const lvlData = [
 ];
 
 function preload() {
-    // Hero Assets
+    // Character and Icon Assets
     this.load.image('dante', 'Dante_32_Bit_Hero.png');
     this.load.image('coco', 'Coco_32_Bit_Hero.png');
     
@@ -58,7 +60,14 @@ function preload() {
     this.load.image('boss4', 'Zombie_Boss.png');
     this.load.image('boss5', 'ChungLi_Boss.png');
 
-    // NPC & Audio
+    // Henchmen
+    this.load.image('henchGhost', 'Ghost.png');
+    this.load.image('henchHorse', 'Horse.png');
+    this.load.image('henchPiranha', 'Piranha.png');
+    this.load.image('henchMonkey', 'Monkey.png');
+    this.load.image('henchUnicorn', 'Unicorn.png');
+
+    // Audio Cue for Tim Robinson
     this.load.audio('timSound', 'Tim_audio.m4a');
 }
 
@@ -66,23 +75,64 @@ function create() {
     const data = lvlData[currentLvl - 1];
     this.cameras.main.setBackgroundColor(data.sky);
     
-    // The Ground
+    // Platform Physics
     const ground = this.add.rectangle(2000, 435, 4000, 30, data.ground);
     this.physics.add.existing(ground, true);
 
-    // Heroes
-    player = this.physics.add.sprite(100, 300, 'dante').setScale(0.8).setDepth(10);
+    // Hero Character
+    player = this.physics.add.sprite(100, 300, activeChar === "DANTE" ? 'dante' : 'coco').setScale(0.8).setDepth(10);
     this.physics.add.collider(player, ground);
 
-    // Henchmen Group
+    // Henchmen: Token Stealers
     henchmen = this.physics.add.group();
     for(let i=0; i<6; i++) {
-        let h = henchmen.create(600 + (i*500), 300, 'hench').setDisplaySize(50, 50);
+        let hKey = 'hench' + data.hench;
+        let h = henchmen.create(800 + (i*500), 300, hKey).setDisplaySize(50, 50);
         h.body.setAllowGravity(false);
-        h.setVelocityX(-120);
+        h.setVelocityX(-130);
     }
 
-    // Token Penalty Logic
+    // Robert Duvall Wizard (The Secret Room Portal)
+    wizard = this.physics.add.sprite(1200, 320, 'wizard').setDisplaySize(60, 90);
+    wizard.body.setAllowGravity(false);
+    this.physics.add.overlap(player, wizard, () => {
+        if (!secretActive) {
+            secretActive = true;
+            this.cameras.main.flash(800, 0, 100, 255);
+            this.cameras.main.setBackgroundColor('#000033'); // Air-Aquarium Visual
+            tokens += 10;
+        }
+    });
+
+    // Tim Robinson Gatekeeper
+    timRobinson = this.physics.add.sprite(2000, 320, 'tim').setDisplaySize(60, 90);
+    timRobinson.body.setAllowGravity(false);
+    bubble = this.add.text(1950, 240, "", { fontSize: '16px', backgroundColor: '#000', padding: 5 }).setVisible(false);
+
+    // Boss Battle
+    boss = this.physics.add.sprite(2400, 250, data.boss).setScale(1.3);
+    this.physics.add.collider(boss, ground);
+    boss.hp = 10;
+
+    // UI & Touch Buttons
+    this.uiText = this.add.text(20, 20, '', { fontSize: '20px', fill: '#fff', stroke: '#000', strokeThickness: 3 }).setScrollFactor(0);
+    
+    const setupUI = (scene) => {
+        const createBtn = (x, y, txt, key) => {
+            let b = scene.add.rectangle(x, y, 90, 70, 0x556B2F).setInteractive().setScrollFactor(0).setAlpha(0.7);
+            scene.add.text(x, y, txt, { fontSize: '16px', fill: '#fff' }).setOrigin(0.5).setScrollFactor(0);
+            b.on('pointerdown', () => { buttons[key] = true; });
+            b.on('pointerup', () => { buttons[key] = false; });
+        };
+        createBtn(70, 380, '◀', 'left'); createBtn(180, 380, '▶', 'right');
+        createBtn(450, 380, 'SWITCH', 'switch'); createBtn(600, 380, 'STRIKE', 'action'); createBtn(710, 380, 'JUMP', 'jump');
+    };
+    setupUI(this);
+
+    this.cameras.main.setBounds(0, 0, 3000, 450);
+    this.cameras.main.startFollow(player, true, 0.1, 0.1);
+
+    // Collision Logic: Henchmen steal tokens
     this.physics.add.overlap(player, henchmen, () => {
         if (!invincibility) {
             if (tokens > 0) tokens--;
@@ -91,90 +141,49 @@ function create() {
             this.time.delayedCall(1500, () => { invincibility = false; player.setAlpha(1); });
         }
     });
-
-    // Robert Duvall Wizard
-    wizard = this.physics.add.sprite(1200, 320, 'wizard').setDisplaySize(60, 90);
-    wizard.body.setAllowGravity(false);
-    this.physics.add.overlap(player, wizard, enterSecretRoom, null, this);
-
-    // Tim Robinson Gatekeeper
-    timRobinson = this.physics.add.sprite(1800, 320, 'tim').setDisplaySize(60, 90);
-    timRobinson.body.setAllowGravity(false);
-    bubble = this.add.text(1750, 240, "", { fontSize: '16px', backgroundColor: '#000', padding: 5 }).setVisible(false);
-
-    // Boss
-    boss = this.physics.add.sprite(2200, 250, data.boss).setScale(1.2);
-    this.physics.add.collider(boss, ground);
-    boss.hp = 5;
-
-    // UI & iPad Controls
-    this.uiText = this.add.text(20, 20, '', { fontSize: '20px', fill: '#fff', stroke: '#000', strokeThickness: 3 }).setScrollFactor(0);
-    setupControls(this);
-
-    this.cameras.main.setBounds(0, 0, 3000, 450);
-    this.cameras.main.startFollow(player, true, 0.1, 0.1);
-}
-
-function enterSecretRoom(p, w) {
-    if (isSecretRoom) return;
-    isSecretRoom = true;
-    this.cameras.main.flash(800, 0, 100, 255);
-    this.cameras.main.setBackgroundColor('#000033'); // Air Aquarium Feel
-    tokens += 10;
-    wizard.destroy();
-}
-
-function setupControls(scene) {
-    const createBtn = (x, y, txt, key) => {
-        let b = scene.add.rectangle(x, y, 90, 70, 0x556B2F).setInteractive().setScrollFactor(0).setAlpha(0.7);
-        scene.add.text(x, y, txt, { fontSize: '18px', fill: '#fff' }).setOrigin(0.5).setScrollFactor(0);
-        b.on('pointerdown', () => { buttons[key] = true; });
-        b.on('pointerup', () => { buttons[key] = false; });
-    };
-    createBtn(70, 380, '◀', 'left'); createBtn(180, 380, '▶', 'right');
-    createBtn(600, 380, 'STRIKE', 'action'); createBtn(710, 380, 'JUMP', 'jump');
 }
 
 function update() {
     if (levelComplete) return;
 
-    // Day/Night Atmospheric Engine
-    dayTimer -= 0.012;
-    if (dayTimer <= 0) { 
-        alert("NIGHT HAS FALLEN! Restarting World..."); 
-        this.scene.restart(); 
-        dayTimer = 100;
+    // Day/Night Timer
+    dayTimer -= 0.015;
+    if (dayTimer <= 0) { alert("NIGHT HAS FALLEN! Saving the Day failed..."); this.scene.restart(); dayTimer = 100; }
+
+    // Character Switching
+    if (buttons.switch) {
+        activeChar = (activeChar === "DANTE") ? "COCO" : "DANTE";
+        player.setTexture(activeChar === "DANTE" ? 'dante' : 'coco');
+        buttons.switch = false;
     }
 
-    // Movement Logic
+    // Movement
     if (buttons.left) { player.setVelocityX(-260); player.setFlipX(true); }
     else if (buttons.right) { player.setVelocityX(260); player.setFlipX(false); }
     else player.setVelocityX(0);
 
     if (buttons.jump && player.body.blocked.down) player.setVelocityY(-550);
 
-    // Tim Robinson Gatekeeper
+    // Tim Robinson Gatekeeper Interaction
     let distToTim = Phaser.Math.Distance.Between(player.x, player.y, timRobinson.x, timRobinson.y);
     if (distToTim < 200) {
         bubble.setVisible(true).setText("YOU SURE ABOUT THAT?").setPosition(timRobinson.x - 80, 240);
         if (!timPlayed) { this.sound.play('timSound'); timPlayed = true; }
-    }
+    } else { bubble.setVisible(false); }
 
     // Combat Logic
     if (buttons.action) {
-        let fx = this.add.circle(player.x + (player.flipX ? -60 : 60), player.y, 40, 0x00ffff, 0.4);
+        let fx = this.add.circle(player.x + (player.flipX ? -60 : 60), player.y, 50, 0x00ffff, 0.4);
         this.time.delayedCall(100, () => fx.destroy());
-        if (Phaser.Math.Distance.Between(player.x, player.y, boss.x, boss.y) < 120) {
-            boss.hp -= 0.05;
+        if (Phaser.Math.Distance.Between(player.x, player.y, boss.x, boss.y) < 130) {
+            boss.hp -= 0.1;
             if (boss.hp <= 0) {
                 levelComplete = true;
-                alert(`WORLD ${currentLvl} SAVED!`);
+                alert(`WORLD SAVED! Proceeding to the next imagination world...`);
                 currentLvl = currentLvl < 5 ? currentLvl + 1 : 1;
+                dayTimer = 100; timPlayed = false; secretActive = false;
                 this.scene.restart();
                 levelComplete = false;
-                timPlayed = false;
-                isSecretRoom = false;
-                dayTimer = 100;
             }
         }
     }
