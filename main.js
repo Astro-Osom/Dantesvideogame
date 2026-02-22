@@ -6,6 +6,10 @@ const config = {
   height: 450,
   parent: "game-container",
   backgroundColor: "#4a90e2",
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH
+  },
   physics: {
     default: "arcade",
     arcade: {
@@ -57,7 +61,7 @@ PlayScene.prototype.create = function () {
   this.dante.setCollideWorldBounds(true);
   this.physics.add.collider(this.dante, ground);
 
-  // Coco (player 2 placeholder) sprite – not yet controllable
+  // Coco (player 2 placeholder) sprite
   this.coco = this.physics.add.sprite(200, 300, "coco");
   this.coco.setCollideWorldBounds(true);
   this.physics.add.collider(this.coco, ground);
